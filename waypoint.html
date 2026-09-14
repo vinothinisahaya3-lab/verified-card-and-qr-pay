@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waypoint — Card & Transaction Guard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#0F1B2B; --ink-2:#16243A; --paper:#EDEAE2; --paper-dim:#D9D4C7;
+    --amber:#E0A73B; --safe:#3F7D5C; --danger:#B5432E; --line:rgba(237,234,226,0.14);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--ink);color:var(--paper);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:960px;margin:0 auto;padding:48px 24px 96px;}
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:500;margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:56px;border-bottom:1px solid var(--line);padding-bottom:20px;}
+  .brand{font-family:'Fraunces',serif;font-size:22px;}
+  .brand span{color:var(--amber);}
+  .disclaimer{font-size:12px;color:var(--paper-dim);max-width:260px;text-align:right;line-height:1.5;}
+  .gates{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+  @media(max-width:640px){.gates{grid-template-columns:1fr;}}
+  .gate{background:var(--ink-2);border:1px solid var(--line);border-radius:2px;padding:36px 28px;cursor:pointer;transition:border-color .15s, transform .15s;}
+  .gate:hover{border-color:var(--amber);transform:translateY(-2px);}
+  .gate .mark{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--amber);letter-spacing:0.08em;}
+  .gate h2{font-size:28px;margin-top:14px;line-height:1.15;}
+  .gate p{color:var(--paper-dim);font-size:14px;line-height:1.6;margin-top:12px;}
+  .backbtn{background:none;border:none;color:var(--paper-dim);font-family:'IBM Plex Mono',monospace;font-size:13px;cursor:pointer;padding:0;margin-bottom:28px;}
+  .backbtn:hover{color:var(--paper);}
+  .panel{background:var(--ink-2);border:1px solid var(--line);border-radius:2px;padding:28px;margin-bottom:20px;}
+  .panel h3{font-size:18px;margin-bottom:16px;}
+  .panel h4{font-size:14px;margin:0 0 10px;color:var(--paper-dim);font-family:'IBM Plex Mono',monospace;font-weight:400;}
+  .row{display:flex;gap:12px;flex-wrap:wrap;}
+  label{display:block;font-size:12px;color:var(--paper-dim);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;}
+  input[type=text],input[type=number],input[type=tel]{width:100%;background:var(--ink);border:1px solid var(--line);color:var(--paper);padding:11px 12px;border-radius:2px;font-size:14px;font-family:'Inter',sans-serif;}
+  input:focus{outline:none;border-color:var(--amber);}
+  .field{flex:1;min-width:180px;margin-bottom:14px;}
+  button.action{background:var(--amber);color:var(--ink);border:none;padding:11px 20px;font-size:14px;border-radius:2px;cursor:pointer;font-weight:600;font-family:'Inter',sans-serif;}
+  button.action:hover{filter:brightness(1.08);}
+  button.action:disabled{opacity:0.4;cursor:not-allowed;}
+  button.ghost{background:none;border:1px solid var(--line);color:var(--paper);padding:9px 16px;border-radius:2px;cursor:pointer;font-size:13px;}
+  button.ghost:hover{border-color:var(--paper);}
+  button.danger-btn{background:var(--danger);color:var(--paper);border:none;padding:10px 18px;border-radius:2px;cursor:pointer;font-size:14px;font-weight:600;}
+  button.safe-btn{background:var(--safe);color:var(--paper);border:none;padding:10px 18px;border-radius:2px;cursor:pointer;font-size:14px;font-weight:600;}
+  button.flag-btn{background:none;border:1px solid var(--amber);color:var(--amber);padding:9px 16px;border-radius:2px;cursor:pointer;font-size:13px;}
+  .card-block{padding:18px 0;border-bottom:1px solid var(--line);}
+  .card-block:last-child{border-bottom:none;}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;}
+  .card-num{font-family:'IBM Plex Mono',monospace;font-size:15px;}
+  .card-meta{font-size:12.5px;color:var(--paper-dim);margin-top:6px;line-height:1.7;}
+  .badges{display:flex;gap:8px;flex-wrap:wrap;}
+  .status{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 10px;border-radius:12px;letter-spacing:0.04em;}
+  .status.unlocked{background:rgba(63,125,92,0.18);color:var(--safe);}
+  .status.locked{background:rgba(181,67,46,0.18);color:var(--danger);}
+  .status.pending{background:rgba(224,167,59,0.18);color:var(--amber);}
+  .status.flagged{background:rgba(224,167,59,0.25);color:var(--amber);}
+  .card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+  .inline-form{background:var(--ink);border:1px solid var(--line);padding:16px;border-radius:2px;margin-top:12px;}
+  .alert{border-left:3px solid var(--amber);background:rgba(224,167,59,0.08);padding:14px 16px;font-size:13.5px;line-height:1.6;margin-bottom:16px;}
+  .alert.danger{border-left-color:var(--danger);background:rgba(181,67,46,0.08);}
+  .alert.safe{border-left-color:var(--safe);background:rgba(63,125,92,0.08);}
+  .otp-box{display:flex;gap:8px;margin:14px 0;}
+  .otp-box input{width:44px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:18px;padding:10px 0;}
+  .step-track{display:flex;gap:6px;margin-bottom:14px;}
+  .step-dot{flex:1;height:3px;background:var(--line);border-radius:2px;}
+  .step-dot.done{background:var(--safe);}
+  .step-dot.active{background:var(--amber);}
+  .qr-area{display:flex;gap:24px;flex-wrap:wrap;}
+  .qr-col{flex:1;min-width:240px;}
+  #qrPreview img, #qrPreview canvas, #cameraVideo{max-width:220px;border-radius:2px;}
+  .drop{border:1px dashed var(--line);border-radius:2px;padding:20px;text-align:center;color:var(--paper-dim);font-size:13px;cursor:pointer;margin-bottom:8px;}
+  .drop:hover{border-color:var(--amber);}
+  #genQrHost{background:var(--paper);padding:12px;display:inline-block;border-radius:2px;margin-top:12px;}
+  .tx-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .tx-row:last-child{border-bottom:none;}
+  .tx-status{font-family:'IBM Plex Mono',monospace;font-size:11px;}
+  .tx-status.completed{color:var(--safe);}
+  .tx-status.declined{color:var(--danger);}
+  .tx-status.blocked{color:var(--danger);}
+  .modal-overlay{position:fixed;inset:0;background:rgba(15,27,43,0.85);display:flex;align-items:center;justify-content:center;z-index:50;}
+  .modal{background:var(--ink-2);border:1px solid var(--amber);padding:32px;max-width:380px;width:90%;border-radius:2px;text-align:center;}
+  .modal h3{margin-bottom:12px;}
+  .modal p{color:var(--paper-dim);font-size:13.5px;line-height:1.6;margin-bottom:20px;}
+  .modal .btnrow{display:flex;gap:12px;justify-content:center;}
+  .empty{color:var(--paper-dim);font-size:13.5px;padding:20px 0;}
+  .bank-tag{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink);background:var(--amber);padding:3px 8px;border-radius:2px;margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+/* ---------- In-memory demo state (nothing persists, nothing leaves this page) ---------- */
+const state = {
+  view: 'home',
+  cards: [
+    { id: 1, last4: '4821', holder: 'A. Ramesh', homeLocation: null, currentLocation: null,
+      locked: false, flagged: false, verifyStage: null, otp: null, pendingLocation: null }
+  ],
+  flagged: [],
+  transactions: []
+};
+
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="top">
+      <div class="brand">Way<span>point</span></div>
+      <div class="disclaimer">Prototype — demo data only, in-memory for this session. No real card, SMS, camera feed, or payment network leaves this page.</div>
+    </div>
+    <div id="body"></div>
+  `;
+  const body = document.getElementById('body');
+  if(state.view === 'home'){ body.innerHTML = renderHome(); wireHome(); }
+  if(state.view === 'cards'){ body.innerHTML = renderCards(); wireCards(); }
+  if(state.view === 'pay'){ body.innerHTML = renderPay(); wirePay(); }
+}
+
+function renderHome(){
+  return `
+    <div class="gates">
+      <div class="gate" id="gateCards">
+        <div class="mark">01 · LOCATION LOCK</div>
+        <h2>Card controls</h2>
+        <p>Set a card's home location and check it against a new location. A mismatch locks the card until the cardholder confirms with a code and the bank signs off on the new location. You can also flag or unflag a card manually at any time.</p>
+      </div>
+      <div class="gate" id="gatePay">
+        <div class="mark">02 · MATCHED PAYMENT</div>
+        <h2>Pay by QR &amp; UPI</h2>
+        <p>Type the UPI ID, then scan a real QR code with your camera. The two are compared before anything moves, and the receiver has to approve it.</p>
+      </div>
+    </div>
+  `;
+}
+function wireHome(){
+  document.getElementById('gateCards').onclick = () => { state.view='cards'; render(); };
+  document.getElementById('gatePay').onclick = () => { state.view='pay'; render(); };
+}
+
+/* ---------------------- CARD CONTROLS ---------------------- */
+function haversine(a, b){
+  const R = 6371;
+  const dLat = (b.lat-a.lat)*Math.PI/180, dLng = (b.lng-a.lng)*Math.PI/180;
+  const s = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+
+function locLabel(loc){ return loc ? loc.label : 'not set'; }
+
+function renderCards(){
+  const rows = state.cards.map(c => renderCardBlock(c)).join('');
+  return `
+    <button class="backbtn" id="back">← back</button>
+    <h2 style="margin-bottom:20px;">Card controls</h2>
+    <div class="panel">
+      <h3>Your cards</h3>
+      ${state.cards.length ? rows : '<div class="empty">No cards yet — add one below.</div>'}
+    </div>
+    <div class="panel">
+      <h3>Add a new card</h3>
+      <p style="color:var(--paper-dim);font-size:12.5px;margin-bottom:16px;">Demo entry only — figures are stored in this browser tab and are never sent anywhere. Home and current location are set separately below, after the card is added.</p>
+      <div class="row">
+        <div class="field"><label>Cardholder name</label><input type="text" id="cName" placeholder="Full name"></div>
+        <div class="field"><label>Card number</label><input type="text" id="cNum" maxlength="19" placeholder="0000 0000 0000 0000"></div>
+      </div>
+      <button class="action" id="addCard">Add card</button>
+      <div id="addMsg" style="margin-top:12px;"></div>
+    </div>
+  `;
+}
+
+function renderCardBlock(c){
+  const status = c.flagged ? 'flagged' : (c.locked ? 'locked' : 'unlocked');
+  const statusLabel = c.flagged ? 'FLAGGED' : (c.locked ? 'LOCKED' : 'UNLOCKED');
+  return `
+    <div class="card-block" data-card="${c.id}">
+      <div class="card-top">
+        <div>
+          <div class="card-num">•••• •••• •••• ${c.last4}</div>
+          <div class="card-meta">
+            ${c.holder}<br>
+            Home location: ${locLabel(c.homeLocation)}<br>
+            Current location: ${locLabel(c.currentLocation)}
+          </div>
+        </div>
+        <div class="badges">
+          <span class="status ${status}">${statusLabel}</span>
+        </div>
+      </div>
+      <div class="card-actions">
+        <button class="ghost" data-action="setHome" data-id="${c.id}">Set home location</button>
+        <button class="ghost" data-action="setCurrent" data-id="${c.id}">Set current location</button>
+        <button class="flag-btn" data-action="toggleFlag" data-id="${c.id}">${c.flagged ? 'Remove flag' : 'Flag this card'}</button>
+      </div>
+      <div id="cardExtra-${c.id}"></div>
+    </div>
+  `;
+}
+
+function wireCards(){
+  document.getElementById('back').onclick = () => { state.view='home'; render(); };
+
+  document.getElementById('addCard').onclick = () => {
+    const num = document.getElementById('cNum').value.replace(/\s/g,'');
+    const name = document.getElementById('cName').value.trim();
+    const msg = document.getElementById('addMsg');
+    if(!name || num.length < 4){ msg.innerHTML = '<div class="alert danger">Enter a cardholder name and card number.</div>'; return; }
+    state.cards.push({ id: Date.now(), last4: num.slice(-4), holder: name, homeLocation:null, currentLocation:null, locked:false, flagged:false, verifyStage:null, otp:null, pendingLocation:null });
+    document.getElementById('cName').value=''; document.getElementById('cNum').value='';
+    msg.innerHTML = '';
+    render();
+  };
+
+  document.querySelectorAll('[data-action]').forEach(btn => {
+    btn.onclick = () => {
+      const id = Number(btn.getAttribute('data-id'));
+      const action = btn.getAttribute('data-action');
+      if(action === 'setHome') showLocationForm(id, 'home');
+      if(action === 'setCurrent') showLocationForm(id, 'current');
+      if(action === 'toggleFlag') toggleFlag(id);
+    };
+  });
+}
+
+function toggleFlag(id){
+  const card = state.cards.find(c => c.id === id);
+  card.flagged = !card.flagged;
+  render();
+}
+
+function showLocationForm(id, kind){
+  const card = state.cards.find(c => c.id === id);
+  const extra = document.getElementById(`cardExtra-${id}`);
+  const label = kind === 'home' ? 'Set home location' : 'Set current location';
+  extra.innerHTML = `
+    <div class="inline-form">
+      <h4>${label}</h4>
+      <div class="row">
+        <div class="field"><label>Location name</label><input type="text" id="locLabel-${id}" placeholder="e.g. Vellore, Tamil Nadu"></div>
+      </div>
+      <button class="ghost" id="useGeo-${id}">Use my browser's current position instead</button>
+      <button class="action" id="saveLoc-${id}" style="margin-left:8px;">Save</button>
+      <div id="locMsg-${id}" style="margin-top:10px;"></div>
+    </div>
+  `;
+  let capturedCoords = null;
+
+  document.getElementById(`useGeo-${id}`).onclick = () => {
+    const msg = document.getElementById(`locMsg-${id}`);
+    if(!navigator.geolocation){ msg.innerHTML = '<div class="alert danger">Geolocation isn\'t available in this browser.</div>'; return; }
+    msg.innerHTML = '<div class="alert">Reading current position…</div>';
+    navigator.geolocation.getCurrentPosition(pos => {
+      capturedCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      document.getElementById(`locLabel-${id}`).value = `${pos.coords.latitude.toFixed(3)}, ${pos.coords.longitude.toFixed(3)}`;
+      msg.innerHTML = '<div class="alert safe">Position captured — you can still edit the name above before saving.</div>';
+    }, () => {
+      msg.innerHTML = '<div class="alert danger">Location permission denied.</div>';
+    });
+  };
+
+  document.getElementById(`saveLoc-${id}`).onclick = () => {
+    const text = document.getElementById(`locLabel-${id}`).value.trim();
+    const msg = document.getElementById(`locMsg-${id}`);
+    if(!text){ msg.innerHTML = '<div class="alert danger">Enter a location name, or capture one from your browser.</div>'; return; }
+    const loc = { label: text, coords: capturedCoords };
+    if(kind === 'home'){
+      card.homeLocation = loc;
+      extra.innerHTML = '';
+      render();
+      return;
+    }
+    // kind === 'current' -> compare against home
+    card.currentLocation = loc;
+    if(!card.homeLocation){
+      extra.innerHTML = '<div class="alert danger">Set a home location first, so there is something to compare against.</div>';
+      return;
+    }
+    const isMismatch = compareLocations(card.homeLocation, loc);
+    if(!isMismatch){
+      extra.innerHTML = '<div class="alert safe">Current location matches the home location on file. No action needed.</div>';
+      render();
+    } else {
+      card.locked = true;
+      card.pendingLocation = loc;
+      card.otp = String(Math.floor(100000 + Math.random()*900000));
+      card.verifyStage = 'otp';
+      render();
+      renderVerifyFlow(id);
+    }
+  };
+}
+
+function compareLocations(home, current){
+  if(home.coords && current.coords){
+    return haversine(home.coords, current.coords) > 50; // km threshold
+  }
+  return home.label.trim().toLowerCase() !== current.label.trim().toLowerCase();
+}
+
+function renderVerifyFlow(id){
+  const card = state.cards.find(c => c.id === id);
+  const extra = document.getElementById(`cardExtra-${id}`);
+  if(!extra) return;
+
+  if(card.verifyStage === 'otp'){
+    extra.innerHTML = `
+      <div class="alert danger">New location detected (${card.pendingLocation.label}), different from home (${card.homeLocation.label}). Card locked pending verification.</div>
+      <div class="inline-form">
+        <div class="step-track"><div class="step-dot active"></div><div class="step-dot"></div></div>
+        <h4>Step 1 of 2 — confirm it's the cardholder</h4>
+        <p style="color:var(--paper-dim);font-size:13px;">In production this code goes by SMS to the cardholder's registered number. Shown here directly for the demo:</p>
+        <div class="alert" style="font-family:'IBM Plex Mono',monospace;font-size:20px;letter-spacing:0.1em;">${card.otp}</div>
+        <div class="otp-box">${[0,1,2,3,4,5].map(i=>`<input maxlength="1" class="otpDigit-${id}" data-i="${i}">`).join('')}</div>
+        <button class="safe-btn" id="confirmOtp-${id}">Confirm code</button>
+        <button class="danger-btn" id="rejectOtp-${id}" style="margin-left:8px;">This wasn't me</button>
+        <div id="otpMsg-${id}" style="margin-top:10px;"></div>
+      </div>
+    `;
+    document.getElementById(`confirmOtp-${id}`).onclick = () => {
+      const entered = Array.from(document.querySelectorAll(`.otpDigit-${id}`)).map(i=>i.value).join('');
+      if(entered === card.otp){
+        card.verifyStage = 'bank';
+        renderVerifyFlow(id);
+      } else {
+        document.getElementById(`otpMsg-${id}`).innerHTML = '<div class="alert danger">Code doesn\'t match. Try again.</div>';
+      }
+    };
+    document.getElementById(`rejectOtp-${id}`).onclick = () => {
+      card.verifyStage = null;
+      card.pendingLocation = null;
+      extra.innerHTML = '<div class="alert danger">Marked as unrecognized activity. Card stays locked — a real system would alert the bank\'s fraud team immediately.</div>';
+      render();
+    };
+    return;
+  }
+
+  if(card.verifyStage === 'bank'){
+    extra.innerHTML = `
+      <div class="inline-form">
+        <div class="step-track"><div class="step-dot done"></div><div class="step-dot active"></div></div>
+        <h4>Step 2 of 2 — bank confirmation</h4>
+        <span class="bank-tag">BANK OPS VIEW (simulated)</span>
+        <p style="color:var(--paper-dim);font-size:13px;">The cardholder confirmed the code. Before the card unlocks, the bank also has to sign off that this person is really in ${card.pendingLocation.label}. This stands in for that internal review step.</p>
+        <button class="safe-btn" id="bankApprove-${id}">Approve as bank</button>
+        <button class="danger-btn" id="bankReject-${id}" style="margin-left:8px;">Reject</button>
+      </div>
+    `;
+    document.getElementById(`bankApprove-${id}`).onclick = () => {
+      card.homeLocation = card.pendingLocation; // new approved location becomes the reference point
+      card.currentLocation = card.pendingLocation;
+      card.pendingLocation = null;
+      card.locked = false;
+      card.verifyStage = null;
+      render();
+    };
+    document.getElementById(`bankReject-${id}`).onclick = () => {
+      card.pendingLocation = null;
+      card.verifyStage = null;
+      extra.innerHTML = '<div class="alert danger">Bank rejected the location change. Card remains locked and the attempt is logged for review.</div>';
+      render();
+    };
+  }
+}
+
+/* ---------------------- PAY BY QR & UPI ---------------------- */
+let decodedUpi = null;
+let cameraStream = null;
+let scanLoopId = null;
+
+function renderPay(){
+  return `
+    <button class="backbtn" id="back">← back</button>
+    <h2 style="margin-bottom:20px;">Pay by QR &amp; UPI</h2>
+    <div class="panel">
+      <h3>Step 1 — enter details separately</h3>
+      <div class="qr-area">
+        <div class="qr-col">
+          <label>Recipient UPI ID (typed)</label>
+          <input type="text" id="upiInput" placeholder="name@bank">
+          <p style="color:var(--paper-dim);font-size:12px;margin-top:8px;">This must match what's encoded in the QR — typing it separately is what stops a swapped or edited QR from silently redirecting funds.</p>
+        </div>
+        <div class="qr-col">
+          <label>QR code</label>
+          <button class="action" id="startCamera" style="margin-bottom:10px;">Scan with camera</button>
+          <div id="cameraWrap" style="display:none;">
+            <video id="cameraVideo" autoplay playsinline muted></video>
+            <canvas id="scanCanvas" style="display:none;"></canvas>
+            <div><button class="ghost" id="stopCamera" style="margin-top:8px;">Stop camera</button></div>
+          </div>
+          <div class="drop" id="dropZone">or click to upload a QR image<input type="file" id="qrFile" accept="image/*" style="display:none;"></div>
+          <div id="qrPreview"></div>
+          <div id="qrDecodeMsg" style="margin-top:8px;font-size:12.5px;color:var(--paper-dim);"></div>
+          <details style="margin-top:14px;">
+            <summary style="cursor:pointer;font-size:12.5px;color:var(--paper-dim);">Don't have a QR handy? Generate one to test with.</summary>
+            <div class="row" style="margin-top:12px;">
+              <div class="field"><label>UPI ID to encode</label><input type="text" id="genUpi" placeholder="name@bank"></div>
+              <div class="field"><label>Amount (₹)</label><input type="number" id="genAmt" placeholder="500"></div>
+            </div>
+            <button class="ghost" id="genQr">Generate test QR</button>
+            <div id="genQrHost" style="display:none;"></div>
+          </details>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Step 2 — match &amp; send</h3>
+      <div id="matchArea"><p class="empty">Enter a UPI ID and scan or upload a QR code to check the match.</p></div>
+    </div>
+    <div class="panel">
+      <h3>Transaction history</h3>
+      <div class="tx-log" id="txLog">
+        ${state.transactions.length ? state.transactions.map(t=>`
+          <div class="tx-row"><span>${t.upi} — ₹${t.amount}</span><span class="tx-status ${t.status}">${t.status.toUpperCase()}</span></div>`).join('') : '<div class="empty">No transactions yet.</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function extractUpi(text){
+  try{
+    if(text.startsWith('upi://')){
+      const url = new URL(text);
+      return { pa: url.searchParams.get('pa'), am: url.searchParams.get('am'), pn: url.searchParams.get('pn') };
+    }
+  }catch(e){}
+  if(/^[\w.\-]+@[\w]+$/.test(text.trim())) return { pa: text.trim(), am: null, pn: null };
+  return null;
+}
+
+function handleDecodedText(rawText){
+  const decodeMsg = document.getElementById('qrDecodeMsg');
+  const parsed = extractUpi(rawText);
+  if(parsed && parsed.pa){
+    decodedUpi = parsed;
+    decodeMsg.textContent = `Decoded — QR contains UPI ID: ${parsed.pa}${parsed.am ? ' · ₹'+parsed.am : ''}`;
+  } else {
+    decodedUpi = null;
+    decodeMsg.textContent = 'QR decoded, but no valid UPI ID was found inside it.';
+  }
+  checkMatch();
+}
+
+function wirePay(){
+  document.getElementById('back').onclick = () => { stopCameraScan(); state.view='home'; render(); };
+
+  document.getElementById('startCamera').onclick = async () => {
+    const wrap = document.getElementById('cameraWrap');
+    const msg = document.getElementById('qrDecodeMsg');
+    try{
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const video = document.getElementById('cameraVideo');
+      video.srcObject = cameraStream;
+      wrap.style.display = 'block';
+      msg.textContent = 'Camera active — point it at a QR code.';
+      const canvas = document.getElementById('scanCanvas');
+      const ctx = canvas.getContext('2d');
+      const tick = () => {
+        if(!cameraStream) return;
+        if(video.readyState === video.HAVE_ENOUGH_DATA){
+          canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imgData.data, canvas.width, canvas.height);
+          if(code){
+            msg.textContent = 'QR captured from camera.';
+            handleDecodedText(code.data);
+            stopCameraScan();
+            return;
+          }
+        }
+        scanLoopId = requestAnimationFrame(tick);
+      };
+      scanLoopId = requestAnimationFrame(tick);
+    }catch(err){
+      msg.textContent = 'Could not access the camera (' + err.message + '). You can upload a QR image instead.';
+    }
+  };
+  document.getElementById('stopCamera').onclick = stopCameraScan;
+
+  document.getElementById('dropZone').onclick = () => document.getElementById('qrFile').click();
+  document.getElementById('qrFile').onchange = (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img,0,0);
+        const imgData = ctx.getImageData(0,0,canvas.width,canvas.height);
+        const code = jsQR(imgData.data, canvas.width, canvas.height);
+        const preview = document.getElementById('qrPreview');
+        preview.innerHTML = ''; preview.appendChild(img);
+        img.style.maxWidth = '180px';
+        if(code){ handleDecodedText(code.data); }
+        else { decodedUpi = null; document.getElementById('qrDecodeMsg').textContent = 'Could not read a QR code in that image.'; }
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  document.getElementById('upiInput').oninput = checkMatch;
+
+  document.getElementById('genQr').onclick = () => {
+    const upi = document.getElementById('genUpi').value.trim();
+    const amt = document.getElementById('genAmt').value.trim();
+    if(!upi) return;
+    const host = document.getElementById('genQrHost');
+    host.style.display = 'inline-block';
+    host.innerHTML = '';
+    const payload = `upi://pay?pa=${encodeURIComponent(upi)}&pn=Demo&am=${encodeURIComponent(amt||'0')}`;
+    new QRCode(host, { text: payload, width: 160, height: 160 });
+  };
+}
+
+function stopCameraScan(){
+  if(scanLoopId) cancelAnimationFrame(scanLoopId);
+  scanLoopId = null;
+  if(cameraStream){ cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  const wrap = document.getElementById('cameraWrap');
+  if(wrap) wrap.style.display = 'none';
+}
+
+function checkMatch(){
+  const typedEl = document.getElementById('upiInput');
+  if(!typedEl) return;
+  const typed = typedEl.value.trim();
+  const area = document.getElementById('matchArea');
+  if(!typed || !decodedUpi){
+    area.innerHTML = '<p class="empty">Enter a UPI ID and scan or upload a QR code to check the match.</p>';
+    return;
+  }
+  if(typed.toLowerCase() !== decodedUpi.pa.toLowerCase()){
+    area.innerHTML = `<div class="alert danger">Mismatch — typed UPI ID (<span class="mono">${typed}</span>) does not match the QR's UPI ID (<span class="mono">${decodedUpi.pa}</span>). Transaction blocked and logged as a flagged attempt.</div>`;
+    state.flagged.push({ typed, qr: decodedUpi.pa, time: new Date().toISOString() });
+    return;
+  }
+  const suggestedAmt = decodedUpi.am && decodedUpi.am !== '0' ? decodedUpi.am : '';
+  area.innerHTML = `
+    <div class="alert safe">UPI ID matches the QR code.</div>
+    <div class="row">
+      <div class="field"><label>Amount (₹)</label><input type="number" id="txAmt" value="${suggestedAmt}" placeholder="500"></div>
+      <div class="field"><label>Receiver's phone (for their confirmation)</label><input type="tel" id="txPhone" placeholder="10-digit number"></div>
+    </div>
+    <button class="action" id="sendConfirm">Send confirmation to receiver</button>
+  `;
+  document.getElementById('sendConfirm').onclick = () => {
+    const amt = Number(document.getElementById('txAmt').value);
+    const phone = document.getElementById('txPhone').value.trim();
+    if(!amt || amt <= 0){ alert('Enter a valid amount.'); return; }
+    if(!/^\d{10}$/.test(phone)){ alert('Enter a 10-digit phone number for the receiver.'); return; }
+    showReceiverModal(typed, amt);
+  };
+}
+
+function showReceiverModal(upi, amt){
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h3>Receiver's phone (simulated)</h3>
+      <p>${upi} wants to send you <strong>₹${amt}</strong>. In a real deployment this would be a push notification or SMS to the receiver — approving or declining here stands in for that.</p>
+      <div class="btnrow">
+        <button class="safe-btn" id="acceptTx">Accept</button>
+        <button class="danger-btn" id="declineTx">Decline</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('acceptTx').onclick = () => {
+    state.transactions.unshift({ upi, amount: amt, status: 'completed' });
+    document.body.removeChild(overlay);
+    render();
+  };
+  document.getElementById('declineTx').onclick = () => {
+    state.transactions.unshift({ upi, amount: amt, status: 'declined' });
+    document.body.removeChild(overlay);
+    render();
+  };
+}
+
+render();
+</script>
+</body>
+</html>
